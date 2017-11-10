@@ -2,9 +2,8 @@ import os
 import tensorflow as tf
 from tensorflow.python.ops import io_ops
 from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
-from input_data import load_wav_file
-from input_data import load_mfcc
-from input_data import test_me
+from input_audio import load_wav_file
+from input_audio import load_mfcc
 from tensorflow.python.platform import test
 
 
@@ -33,6 +32,14 @@ class InputDataTest(test.TestCase):
         file_path = os.path.join(tmp_dir, "load_test.wav")
         wav_data = self.getWavData()
         self.saveTestWavFile(file_path, wav_data)
+        mfcc = load_mfcc(file_path)
+        self.assertIsNotNone(mfcc)
+
+    def testLoadRealMfcc(self):
+        file_name = "1.wav"
+        data_dir = "data"
+        dir = os.path.dirname(__file__)
+        file_path = os.path.join(dir, "..", data_dir, file_name)
         mfcc = load_mfcc(file_path)
         self.assertIsNotNone(mfcc)
 

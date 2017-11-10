@@ -3,7 +3,7 @@ import tensorflow as tf
 import os
 import scipy.io.wavfile as wav
 import numpy as np
-from python_speech_features import mfcc
+from input_audio import load_mfcc
 
 
 SPACE_TOKEN = '<space>'
@@ -83,11 +83,10 @@ num_examples = 1
 num_batches_per_epoch = int(num_examples/batch_size)
 
 # Loading the data
-fs, audio = wav.read(data_path(audio_filename))
+inputs = load_mfcc(data_path(audio_filename))
 
-inputs = mfcc(audio, samplerate=fs)
 # Tranform in 3D array
-train_inputs = np.asarray(inputs[np.newaxis, :])
+train_inputs = inputs
 train_inputs = (train_inputs - np.mean(train_inputs))/np.std(train_inputs)
 train_seq_len = [train_inputs.shape[1]]
 
@@ -140,7 +139,8 @@ with graph.as_default():
     cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
 
     # Stacking rnn cells
-    stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
+    stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers,
+                                        state_is_tuple=True)
 
     # The second output is the last state and we will no use that
     outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
