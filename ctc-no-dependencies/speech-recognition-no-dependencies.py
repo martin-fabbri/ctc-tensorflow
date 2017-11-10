@@ -26,8 +26,8 @@ num_examples = 1
 mini_batch_size = 1
 
 # load training audio
-audio_filename = '1.wav'
-target_filename = '1.txt'
+audio_filename = '2.wav'
+target_filename = '2.txt'
 
 
 def data_path(file_name):
