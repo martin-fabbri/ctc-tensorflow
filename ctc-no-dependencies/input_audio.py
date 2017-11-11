@@ -60,10 +60,11 @@ def load_mfcc(filename):
         #     should be.
         #   > python_speech_features also defaults winstep to 10
         #
-        # magnitude_squared=False (Default) -> todo: should we chanfe this parameter to True?
+        # magnitude_squared=False (Default) -> todo: should we change this parameter to True?
         #   > Whether to return the squared magnitude or just the
         #     magnitude. Using squared magnitude can avoid extra
         #     calculations.
+        #   > magnitude_squared=True -> seems to delay the network conversion
         #
         # dct_coefficient_count=13 (default) ->
         #   > How many output channels to produce per time slice.
@@ -73,7 +74,7 @@ def load_mfcc(filename):
             wav_decoder.audio,
             window_size=550,  # for efficiency make it a power of 2
             stride=350,
-            #magnitude_squared=True
+            magnitude_squared=False
         )
 
         mfcc = contrib_audio.mfcc(

@@ -4,14 +4,13 @@ import os
 import scipy.io.wavfile as wav
 import numpy as np
 from input_audio import load_mfcc
+from mappings import char_map
+from utils import char_to_int_encode, int_to_char_decode
 
-
-SPACE_TOKEN = '<space>'
-SPACE_INDEX = 0
-FIRST_INDEX = ord('a') - 1  # 0 reserved for space
-
+# Some configs
 num_features = 13
-num_classes = 28  # [a..z], <space>, <blank>
+# Accounting the 0th indice +  space + blank label = 28 characters
+num_classes = len(char_map)
 
 # training hyper-parameters
 num_epochs = 200
@@ -35,10 +34,6 @@ def data_path(file_name):
     return os.path.join(dir, '..', 'data', file_name)
 
 
-def char2index(x):
-    return SPACE_INDEX if x == SPACE_TOKEN else ord(x) - FIRST_INDEX
-
-
 def sparse_tuple_from(sequences, dtype=np.int32):
     """
     Create a sparse representention of x.
@@ -59,17 +54,6 @@ def sparse_tuple_from(sequences, dtype=np.int32):
     shape = np.asarray([len(sequences), np.asarray(indices).max(0)[1]+1], dtype=np.int64)
 
     return indices, values, shape
-
-
-# Constants
-SPACE_TOKEN = '<space>'
-SPACE_INDEX = 0
-FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
-
-# Some configs
-num_features = 13
-# Accounting the 0th indice +  space + blank label = 28 characters
-num_classes = ord('z') - ord('a') + 1 + 1 + 1
 
 # Hyper-parameters
 num_epochs = 200
@@ -95,25 +79,17 @@ with open(data_path(target_filename), 'r') as f:
 
     #Only the last line is necessary
     line = f.readlines()[-1]
-
-    # Get only the words between [a-z] and replace period for none
-    original = ' '.join(line.strip().lower().split(' ')[2:]).replace('.', '')
-    targets = original.replace(' ', '  ')
-    targets = targets.split(' ')
-
-# Adding blank label
-targets = np.hstack([SPACE_TOKEN if x == '' else list(x) for x in targets])
+    original = line.replace("\n", "")
+    targets = original
 
 # Transform char into index
-targets = np.asarray([SPACE_INDEX if x == SPACE_TOKEN else ord(x) - FIRST_INDEX
-                      for x in targets])
+targets = np.asarray(char_to_int_encode(targets))
 
 # Creating sparse representation to feed the placeholder
 train_targets = sparse_tuple_from([targets])
 
 # We don't have a validation dataset :(
-val_inputs, val_targets, val_seq_len = train_inputs, train_targets, \
-                                       train_seq_len
+val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len
 
 
 # THE MAIN CODE!
@@ -217,11 +193,7 @@ with tf.Session(graph=graph) as session:
                          val_cost, val_ler, time.time() - start))
     # Decoding
     d = session.run(decoded[0], feed_dict=feed)
-    str_decoded = ''.join([chr(x) for x in np.asarray(d[1]) + FIRST_INDEX])
-    # Replacing blank label to none
-    str_decoded = str_decoded.replace(chr(ord('z') + 1), '')
-    # Replacing space label to space
-    str_decoded = str_decoded.replace(chr(ord('a') - 1), ' ')
+    str_decoded = int_to_char_decode(d.values)
 
     print('Original:\n%s' % original)
     print('Decoded:\n%s' % str_decoded)
