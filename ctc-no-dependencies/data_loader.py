@@ -3,18 +3,85 @@ Defines a class that is used to load and featurize audio data
 for training and testing.
 """
 
-# todo: load mfcc and labels
-# todo: load batches(mini batches)
-# todo: split data into train, test, validation
+# todo: [ ] load mfccs and labels
+# todo: [ ] load batches(mini batches)
+# todo: [ ] split data into train, test, validation
 
+import tensorflow as tf
 import numpy as np
 import logging
 import json
+from tensorflow.python.ops import io_ops
 from sklearn.model_selection import train_test_split
+from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 
 logger = logging.getLogger(__name__)
 
 
+# graph regions
+def _load_wav_file_segment(filename):
+    """
+    Builds a TensorFlow graph segment that loads a .wav file
+    This function should be called within an **Active** TensorFlow session
+    :arg filename: Path to .wav file
+    :arg sess:
+    :return: Audio encoder node, Node's placeholders dict
+    """
+    wav_file_placeholder = tf.placeholder(tf.string, [])
+    wav_loader = io_ops.read_file(wav_file_placeholder)
+    # todo: do we need to pass sample rate?
+    feed_dict = {wav_file_placeholder: filename}
+    return contrib_audio.decode_wav(wav_loader, desired_channels=1), feed_dict
+
+
+def _load_mfcc_segment(filename, window_size_ms, window_stride_ms, dct_coefficient_count):
+    """
+    Builds a TensorFlow graph segment that extract the MFCC fingerprints
+
+    :param filename:
+    :param sess:
+    :param window_size_ms: time slice duration to estimate frequencies from
+    :param dct_coefficient_count: How many output channels to produce per time slice
+    :param sample_rate??:
+    :return:
+    """
+    # todo: desired_samples = 16000  # todo: default should be 16K instead?
+    wav_decoder, feed_dict = _load_wav_file_segment(filename)
+    spectrogram = contrib_audio.audio_spectrogram(
+        wav_decoder.audio,
+        window_size=window_size_ms,  # for efficiency make it a power of 2
+        stride=window_stride_ms,
+        magnitude_squared=False
+    )
+    mfcc = contrib_audio.mfcc(spectrogram, wav_decoder.sample_rate, dct_coefficient_count=dct_coefficient_count)
+    return mfcc, feed_dict
+
+
+# standalone audio processing
+def load_wav_file(filename):
+    with tf.Session(graph=tf.Graph()) as sess:
+        wav_decoder, feed_dict = _load_wav_file_segment(filename)
+        return sess.run(wav_decoder, feed_dict).audio.flatten()
+
+
+def load_mfcc(filename, window_size_ms=550, window_stride_ms=350, dct_coefficient_count=13):
+    """
+    Builds a TensorFlow graph segment that extract the MFCC fingerprints
+
+    :param filename:
+    :param sess:
+    :param window_size_ms: time slice duration to estimate frequencies from
+    :param window_stride_ms:
+    :param dct_coefficient_count: How many output channels to produce per time slice
+    :param sample_rate??:
+    :return:
+    """
+    with tf.Session(graph=tf.Graph()) as sess:
+        mfcc, feed_dict = _load_mfcc_segment(filename, window_size_ms, window_stride_ms, dct_coefficient_count)
+        return sess.run(mfcc, feed_dict)
+
+
+# load training metadata
 def load_metadata_from_desc_file(desc_file, max_duration):
     """
     Reads metadata from dataset descriptor file.
@@ -27,18 +94,22 @@ def load_metadata_from_desc_file(desc_file, max_duration):
     """
     logger.info(f"Loading dataset metadata from {desc_file}")
     audio_paths, durations, texts = [], [], []
-    with open(desc_file) as json_line_file:
-        for line_num, json_line in enumerate(json_line_file):
-            try:
-                spec = json.loads(json_line)
-                if float(spec['duration']) > max_duration:
-                    continue
-                audio_paths.append(spec['key'])
-                durations.append(float(spec['duration']))
-                texts.append(spec['text'])
-            except Exception as e:
-                logger.warning(f"Error reading line #{line_num}: {json_line}")
-                logger.warning(str(e))
+    try:
+        with open(desc_file) as json_line_file:
+            for line_num, json_line in enumerate(json_line_file):
+                try:
+                    spec = json.loads(json_line)
+                    if float(spec['duration']) > max_duration:
+                        continue
+                    audio_paths.append(spec['key'])
+                    durations.append(float(spec['duration']))
+                    texts.append(spec['text'])
+                except Exception as e:
+                    logger.warning(f"Error reading line #{line_num}: {json_line}")
+                    logger.warning(str(e))
+    except Exception:
+        raise Exception("Descriptor file not found.")
+
     return audio_paths, texts
 
 

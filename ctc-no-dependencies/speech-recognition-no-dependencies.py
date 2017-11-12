@@ -1,9 +1,10 @@
-import time
-import tensorflow as tf
 import os
-import scipy.io.wavfile as wav
+import time
+
 import numpy as np
-from input_audio import load_mfcc
+import tensorflow as tf
+
+from data_loader import load_mfcc
 from mappings import char_map
 from utils import char_to_int_encode, int_to_char_decode
 
@@ -163,7 +164,6 @@ with graph.as_default():
 with tf.Session(graph=graph) as session:
     # Initializate the weights and biases
     tf.global_variables_initializer().run()
-
 
     for curr_epoch in range(num_epochs):
         train_cost = train_ler = 0
