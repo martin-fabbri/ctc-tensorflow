@@ -1,9 +1,10 @@
 """
 todo: Document
 """
-import string
-from mappings import char_map, index_map
-from constants import PUNCTUATION
+import json
+from utils.constants import PUNCTUATION
+from utils.mappings import char_map, index_map
+
 
 def char_to_int_encode(text):
     """
@@ -29,3 +30,8 @@ def int_to_char_decode(encoded):
     :return:
     """
     return "".join([index_map[i] for i in encoded])
+
+
+def load_config(absolute_json_file_path):
+    with open(absolute_json_file_path, encoding='utf-8-sig') as json_file:
+        return json.load(json_file)

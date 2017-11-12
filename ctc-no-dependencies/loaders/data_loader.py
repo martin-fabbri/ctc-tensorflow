@@ -7,13 +7,16 @@ for training and testing.
 # todo: [ ] load batches(mini batches)
 # todo: [ ] split data into train, test, validation
 
-import tensorflow as tf
-import numpy as np
-import logging
 import json
-from tensorflow.python.ops import io_ops
+import logging
+import random
+from concurrent.futures import ThreadPoolExecutor, wait
+
+import numpy as np
 from sklearn.model_selection import train_test_split
-from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
+
+from .audio_loader import mfcc_segment, normalize
+from utils import RANDOM_SEED
 
 logger = logging.getLogger(__name__)
 
@@ -48,25 +51,23 @@ def load_metadata_from_desc_file(desc_file, max_duration):
     return audio_paths, texts
 
 
-def normalize(feature, eps=1e-14):
-    return (feature - np.mean(feature)) / (np.std(feature) + eps)
+def sort_by_duration(durations, audio_paths, texts):
+    return
 
 
 class DataLoader(object):
-    def __init__(self, desc_file, test_size=None, random_state=None):
+    def __init__(self, desc_file, test_size=None, max_duration=10.0):
         """
         :param desc_file: Path to dataset description file
         :param max_freq:
         :param test_size:
         :param random_state:
         """
-        #audio_paths, texts = load_metadata_from_desc_file(desc_file, max_duration)
-        # self.audio_train, self.audio_test, self.text_train, self.text_test = train_test_split(audio_paths, texts,
-        #                                                                                       test_size=test_size,
-        #                                                                                       random_state=random_state)
-        # self.wav_decoder, self.wav_file_placeholder = self._build_load_wav_file_segment()
-        # self.mfcc_decoder = self._build_extract_mfcc_segment()
-
+        self.rng = random.Random(RANDOM_SEED)
+        audio_paths, texts = load_metadata_from_desc_file(desc_file, max_duration)
+        self.audio_train, self.audio_test, self.text_train, self.text_test = train_test_split(audio_paths, texts,
+                                                                                              test_size=test_size,
+                                                                                              random_state=self.rng)
         logger.info("DataLoader initialization complete.")
 
     def __call__(self, normalized_mfcc, wav_file_placeholder):
@@ -74,16 +75,7 @@ class DataLoader(object):
         return self
 
     # graph regions
-    def _build_batch_fetching_segment(self):
-        pass
-
-    def featurize(self, audio_wav):
-        """
-        for a given audio file
-        """
-        pass
-
-    def prepare_minibatch(self, audio_paths, texts):
+    def prepare_minibatch(self, audio_paths, texts, sess, mfcc, wav_file_placeholder):
         """ Featurize a minibatch of audio, zero pad them and return a dictionary
         Params:
             audio_paths (list(str)): List of paths to audio files
@@ -92,70 +84,52 @@ class DataLoader(object):
             dict: See below for contents
         """
         assert len(audio_paths) == len(texts), "Inputs and outputs to the network must be of the same number"
-        # Features is a list of (timesteps, feature_dim) arrays
-        # Calculate the features for each audio clip, as the log of the
-        # Fourier Transform of the audio
-        features = [self.featurize(a) for a in audio_paths]
-        input_lengths = [f.shape[0] for f in features]
-        max_length = max(input_lengths)
-        feature_dim = features[0].shape[1]
-        mb_size = len(features)
-        # Pad all the inputs so that they are all the same length
-        x = np.zeros((mb_size, max_length, feature_dim))
-        y = []
-        label_lengths = []
-        for i in range(mb_size):
-            feat = features[i]
-            feat = normalize(feat)  # Center using means and std
-            x[i, :feat.shape[0], :] = feat
-            label = text_to_int_sequence(texts[i])
-            y.append(label)
-            label_lengths.append(len(label))
-        y = None
-        return {
-            'x': x,  # (0-padded features of shape(mb_size,timesteps,feat_dim)
-            'y': y,  # list(int) Flattened labels (integer sequences)
-            'texts': texts,  # list(str) Original texts
-            'input_lengths': input_lengths,  # list(int) Length of each input
-            'label_lengths': label_lengths  # list(int) Length of each label
-        }
+        features = [normalize(sess.run(mfcc, {wav_file_placeholder: a})) for a in audio_paths]
+        labels = []
+        return features, labels, texts
 
-    def iterate(self, audio_paths, texts, minibatch_size):
+    def iterate(self, audio_paths, texts, minibatch_size, sess):
         k_iters = int(np.ceil(len(audio_paths) / minibatch_size))
-        logger.info(f"Iters: {k_iters}")
+        logger.debug("Preparing {k_iters} minibatches iters")
+        mfcc, wav_file_placeholder = mfcc_segment(window_size_ms, window_stride_ms, dct_coefficient_count)
+        pool = ThreadPoolExecutor(1)  # Run a single I/O thread in parallel
+        future = pool.submit(self.prepare_minibatch,
+                             audio_paths[:minibatch_size],
+                             texts[:minibatch_size],
+                             sess)
         start = minibatch_size
         for i in range(k_iters - 1):
+            wait([future])
+            minibatch = future.result()
             # While the current minibatch is being consumed, prepare the next
-            x = self.prepare_minibatch(
-                audio_paths[start: start + minibatch_size],
-                texts[start: start + minibatch_size]
-            )
-            yield x
+            future = pool.submit(self.prepare_minibatch,
+                                 audio_paths[start: start + minibatch_size],
+                                 texts[start: start + minibatch_size],
+                                 sess
+                                 )
+            yield minibatch
             start += minibatch_size
+        # Wait on the last minibatch
+        wait([future])
+        minibatch = future.result()
+        yield minibatch
 
-    def load_train_data(self, desc_file):
-        load_metadata_from_desc_file(desc_file, 'train')
+    def next_training_batch(self, sess, minibatch_size=16, sort_by_duration=False, shuffle=True):
+        logger.debug(f"Preparing training batch: minibatch_size {minibatch_size}")
+        durations, audio_paths, texts = self.train_durations, self.train_audio_paths, self.train_texts
+        if shuffle:
+            temp = zip(durations, audio_paths, texts)
+            self.rng.shuffle(temp)
+            durations, audio_paths, texts = zip(*temp)
+        elif sort_by_duration:
+            durations, audio_paths, texts = sort_by_duration(durations, audio_paths, texts)
 
-    def next_training_batch(self, minibatch_size=16, sort_by_duration=False, shuffle=True):
-        """
-        :param minibatch_size:
-        :param sort_by_duration:
-        :param shuffle:
-        :return:
-        """
-        # return self.iterate(audio_paths, texts, minibatch_size)
-        yield 1
-        yield 2
-        yield 3
+        return self.iterate(audio_paths, texts, minibatch_size, sess)
 
-    def next_testing_batch(self, minibatch_size=16, sort_by_duration=False, shuffle=True):
-        yield 1
-        yield 2
-        yield 3
+    def next_testing_batch(self, sess, minibatch_size=16, sort_by_duration=False, shuffle=False):
+        pass
 
-    def next_validation_batch(self, minibatch_size=16, sort_by_duration=False, shuffle=True):
-        yield 1
-        yield 2
-        yield 3
+    def next_validation_batch(self, sess, minibatch_size=16, sort_by_duration=False, shuffle=False):
+        pass
 
-loader = DataLoader("")("Yeiiiiiiiii")
+

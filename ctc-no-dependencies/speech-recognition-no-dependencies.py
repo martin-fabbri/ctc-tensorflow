@@ -4,9 +4,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from loaders.audio_loader import load_mfcc, normalize
-from mappings import char_map
-from utils import char_to_int_encode, int_to_char_decode
+from loaders import load_mfcc, normalize
+from utils import char_map, char_to_int_encode, int_to_char_decode
 
 # Some configs
 num_features = 13

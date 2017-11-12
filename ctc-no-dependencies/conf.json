@@ -1,0 +1,10 @@
+{
+  "dataset": {
+    "path": "/tmp/xyz"
+  },
+  "audio": {
+    "window_size_ms": 550,
+    "window_stride_ms": 350,
+    "dct_coefficient_count": 13
+  }
+}

@@ -1,13 +1,14 @@
 """
 
 """
-from utils import char_to_int_encode, int_to_char_decode
+import os
+from utils import char_to_int_encode, int_to_char_decode, load_config
 from tensorflow.python.platform import test
 
-ENCODED_TARGET = [6, 17, 16, 22, 2, 3, 21, 13, 2, 15, 7, 2, 22, 17, 2, 5, 3, 20, 20, 27]
+ENCODED_TARGET = [5, 16, 15, 21, 1, 2, 20, 12, 1, 14, 6, 1, 21, 16, 1, 4, 2, 19, 19, 26]
 ORIGINAL_TEXT = "Dont ask me to carry"
 
-TARGET_WITH_PUNCTUATION = [6, 17, 16, 1, 22, 2, 3, 21, 13, 2, 15, 7, 2, 22, 17, 2, 5, 3, 20, 20, 27]
+TARGET_WITH_PUNCTUATION = [5, 16, 15, 0, 21, 1, 2, 20, 12, 1, 14, 6, 1, 21, 16, 1, 4, 2, 19, 19, 26]
 TEXT_WITH_PUNCTUATION = "Don't ask me to carry."
 
 
@@ -31,6 +32,11 @@ class UtilsTest(test.TestCase):
         decoded = int_to_char_decode(TARGET_WITH_PUNCTUATION)
         self.assertEqual(len(decoded), len(TARGET_WITH_PUNCTUATION))
         self.assertEqual(decoded, TEXT_WITH_PUNCTUATION.lower().strip("."))
+
+    def testLoadConfig(self):
+        test_config_path = os.path.join(os.path.dirname(__file__), 'unittest_conf.json')
+        test_config = load_config(test_config_path)
+        print(test_config)
 
 
 if __name__ == "__main__":
