@@ -4,7 +4,7 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from data_loader import load_mfcc
+from loaders.audio_loader import load_mfcc, normalize
 from mappings import char_map
 from utils import char_to_int_encode, int_to_char_decode
 
@@ -72,7 +72,7 @@ inputs = load_mfcc(data_path(audio_filename))
 
 # Tranform in 3D array
 train_inputs = inputs
-train_inputs = (train_inputs - np.mean(train_inputs))/np.std(train_inputs)
+train_inputs = normalize(train_inputs)
 train_seq_len = [train_inputs.shape[1]]
 
 # Readings targets

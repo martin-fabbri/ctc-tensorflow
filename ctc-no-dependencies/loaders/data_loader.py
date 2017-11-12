@@ -17,70 +17,6 @@ from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 
 logger = logging.getLogger(__name__)
 
-
-# graph regions
-def _load_wav_file_segment(filename):
-    """
-    Builds a TensorFlow graph segment that loads a .wav file
-    This function should be called within an **Active** TensorFlow session
-    :arg filename: Path to .wav file
-    :arg sess:
-    :return: Audio encoder node, Node's placeholders dict
-    """
-    wav_file_placeholder = tf.placeholder(tf.string, [])
-    wav_loader = io_ops.read_file(wav_file_placeholder)
-    # todo: do we need to pass sample rate?
-    feed_dict = {wav_file_placeholder: filename}
-    return contrib_audio.decode_wav(wav_loader, desired_channels=1), feed_dict
-
-
-def _load_mfcc_segment(filename, window_size_ms, window_stride_ms, dct_coefficient_count):
-    """
-    Builds a TensorFlow graph segment that extract the MFCC fingerprints
-
-    :param filename:
-    :param sess:
-    :param window_size_ms: time slice duration to estimate frequencies from
-    :param dct_coefficient_count: How many output channels to produce per time slice
-    :param sample_rate??:
-    :return:
-    """
-    # todo: desired_samples = 16000  # todo: default should be 16K instead?
-    wav_decoder, feed_dict = _load_wav_file_segment(filename)
-    spectrogram = contrib_audio.audio_spectrogram(
-        wav_decoder.audio,
-        window_size=window_size_ms,  # for efficiency make it a power of 2
-        stride=window_stride_ms,
-        magnitude_squared=False
-    )
-    mfcc = contrib_audio.mfcc(spectrogram, wav_decoder.sample_rate, dct_coefficient_count=dct_coefficient_count)
-    return mfcc, feed_dict
-
-
-# standalone audio processing
-def load_wav_file(filename):
-    with tf.Session(graph=tf.Graph()) as sess:
-        wav_decoder, feed_dict = _load_wav_file_segment(filename)
-        return sess.run(wav_decoder, feed_dict).audio.flatten()
-
-
-def load_mfcc(filename, window_size_ms=550, window_stride_ms=350, dct_coefficient_count=13):
-    """
-    Builds a TensorFlow graph segment that extract the MFCC fingerprints
-
-    :param filename:
-    :param sess:
-    :param window_size_ms: time slice duration to estimate frequencies from
-    :param window_stride_ms:
-    :param dct_coefficient_count: How many output channels to produce per time slice
-    :param sample_rate??:
-    :return:
-    """
-    with tf.Session(graph=tf.Graph()) as sess:
-        mfcc, feed_dict = _load_mfcc_segment(filename, window_size_ms, window_stride_ms, dct_coefficient_count)
-        return sess.run(mfcc, feed_dict)
-
-
 # load training metadata
 def load_metadata_from_desc_file(desc_file, max_duration):
     """
@@ -109,24 +45,37 @@ def load_metadata_from_desc_file(desc_file, max_duration):
                     logger.warning(str(e))
     except Exception:
         raise Exception("Descriptor file not found.")
-
     return audio_paths, texts
 
 
+def normalize(feature, eps=1e-14):
+    return (feature - np.mean(feature)) / (np.std(feature) + eps)
+
+
 class DataLoader(object):
-    def __init__(self, desc_file, window_ms=20, max_freq=8000, max_duration=10.0, test_size=None, random_state=None):
+    def __init__(self, desc_file, test_size=None, random_state=None):
         """
         :param desc_file: Path to dataset description file
-        :param window_ms: MFCC window size in milliseconds
         :param max_freq:
         :param test_size:
         :param random_state:
         """
-        audio_paths, texts = load_metadata_from_desc_file(desc_file, max_duration)
-        self.audio_train, self.audio_test, self.text_train, self.text_test = train_test_split(audio_paths, texts,
-                                                                                              test_size=test_size,
-                                                                                              random_state=random_state)
+        #audio_paths, texts = load_metadata_from_desc_file(desc_file, max_duration)
+        # self.audio_train, self.audio_test, self.text_train, self.text_test = train_test_split(audio_paths, texts,
+        #                                                                                       test_size=test_size,
+        #                                                                                       random_state=random_state)
+        # self.wav_decoder, self.wav_file_placeholder = self._build_load_wav_file_segment()
+        # self.mfcc_decoder = self._build_extract_mfcc_segment()
+
         logger.info("DataLoader initialization complete.")
+
+    def __call__(self, normalized_mfcc, wav_file_placeholder):
+        self.build_batch_fetching_segment(normalized_mfcc, wav_file_placeholder)
+        return self
+
+    # graph regions
+    def _build_batch_fetching_segment(self):
+        pass
 
     def featurize(self, audio_wav):
         """
@@ -157,7 +106,7 @@ class DataLoader(object):
         label_lengths = []
         for i in range(mb_size):
             feat = features[i]
-            feat = self.normalize(feat)  # Center using means and std
+            feat = normalize(feat)  # Center using means and std
             x[i, :feat.shape[0], :] = feat
             label = text_to_int_sequence(texts[i])
             y.append(label)
@@ -208,3 +157,5 @@ class DataLoader(object):
         yield 1
         yield 2
         yield 3
+
+loader = DataLoader("")("Yeiiiiiiiii")
