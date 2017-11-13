@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from loaders import load_mfcc, normalize
-from utils import char_map, char_to_int_encode, int_to_char_decode
+from utils import char_map, char_to_int_encode, int_to_char_decode, load_config
 
 # Some configs
 num_features = 13
@@ -66,8 +66,12 @@ momentum = 0.9
 num_examples = 1
 num_batches_per_epoch = int(num_examples/batch_size)
 
+# loading audio processing config
+config_path = os.path.join(os.path.dirname(__file__), "config.yml")
+config = load_config(config_path)
+
 # Loading the data
-inputs = load_mfcc(data_path(audio_filename))
+inputs = load_mfcc(data_path(audio_filename), config.audio)
 
 # Tranform in 3D array
 train_inputs = inputs
@@ -76,7 +80,6 @@ train_seq_len = [train_inputs.shape[1]]
 
 # Readings targets
 with open(data_path(target_filename), 'r') as f:
-
     #Only the last line is necessary
     line = f.readlines()[-1]
     original = line.replace("\n", "")

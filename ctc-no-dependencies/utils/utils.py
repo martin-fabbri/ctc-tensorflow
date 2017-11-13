@@ -1,7 +1,8 @@
 """
 todo: Document
 """
-import json
+import yaml
+import namedtupled
 from utils.constants import PUNCTUATION
 from utils.mappings import char_map, index_map
 
@@ -33,5 +34,5 @@ def int_to_char_decode(encoded):
 
 
 def load_config(absolute_json_file_path):
-    with open(absolute_json_file_path, encoding='utf-8-sig') as json_file:
-        return json.load(json_file)
+    with open(absolute_json_file_path, encoding='utf-8-sig') as ymal_file:
+        return namedtupled.map(yaml.load(ymal_file))

@@ -33,7 +33,7 @@ def load_wav_file_segment():
 
 
 # todo: desired_samples = 16000  # todo: default should be 16K instead?
-def mfcc_segment(window_size_ms, window_stride_ms, dct_coefficient_count):
+def mfcc_segment(audio_config):
     """
     Builds a TensorFlow graph segment that extract the MFCC fingerprints
 
@@ -46,12 +46,12 @@ def mfcc_segment(window_size_ms, window_stride_ms, dct_coefficient_count):
     wav_decoder, wav_file_placeholder = load_wav_file_segment()
     spectrogram = contrib_audio.audio_spectrogram(
         wav_decoder.audio,
-        window_size=window_size_ms,  # for efficiency make it a power of 2
-        stride=window_stride_ms,
+        window_size=audio_config.window_size_ms,  # for efficiency make it a power of 2
+        stride=audio_config.window_stride_ms,
         magnitude_squared=False
     )
     return contrib_audio.mfcc(spectrogram, wav_decoder.sample_rate,
-                              dct_coefficient_count=dct_coefficient_count), wav_file_placeholder
+                              dct_coefficient_count=audio_config.dct_coefficient_count), wav_file_placeholder
 
 
 # standalone audio processing
@@ -62,8 +62,8 @@ def load_wav_file(filename):
         return sess.run(wav_decoder, feed_dict).audio.flatten()
 
 
-def load_mfcc(filename, window_size_ms=550, window_stride_ms=350, dct_coefficient_count=13):
+def load_mfcc(filename, audio_config):
     with tf.Session(graph=tf.Graph()) as sess:
-        mfcc, wav_file_placeholder = mfcc_segment(window_size_ms, window_stride_ms, dct_coefficient_count)
+        mfcc, wav_file_placeholder = mfcc_segment(audio_config)
         feed_dict = {wav_file_placeholder: filename}
         return sess.run(mfcc, feed_dict)

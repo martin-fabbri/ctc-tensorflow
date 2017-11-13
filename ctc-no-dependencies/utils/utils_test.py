@@ -34,9 +34,11 @@ class UtilsTest(test.TestCase):
         self.assertEqual(decoded, TEXT_WITH_PUNCTUATION.lower().strip("."))
 
     def testLoadConfig(self):
-        test_config_path = os.path.join(os.path.dirname(__file__), 'unittest_conf.json')
+        test_config_path = os.path.join(os.path.dirname(__file__), 'unitest_config.yml')
         test_config = load_config(test_config_path)
-        print(test_config)
+        self.assertIsNotNone(test_config)
+        self.assertTrue("dataset" in test_config)
+        self.assertTrue("audio" in test_config)
 
 
 if __name__ == "__main__":
