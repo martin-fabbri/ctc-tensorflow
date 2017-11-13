@@ -37,8 +37,8 @@ class UtilsTest(test.TestCase):
         test_config_path = os.path.join(os.path.dirname(__file__), 'unitest_config.yml')
         test_config = load_config(test_config_path)
         self.assertIsNotNone(test_config)
-        self.assertTrue("dataset" in test_config)
-        self.assertTrue("audio" in test_config)
+        self.assertIsNotNone(test_config.dataset)
+        self.assertIsNotNone(test_config.audio)
 
 
 if __name__ == "__main__":

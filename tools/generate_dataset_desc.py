@@ -11,7 +11,7 @@ Fields considerations:
 """
 
 import argparse
-import json
+import yaml
 import os
 import wave
 
@@ -46,9 +46,9 @@ def main(data_directory, output_file):
                     labels.append(label)
 
         with open(output_file, 'w') as out_file:
-            for key, duration, label in zip(keys, durations, labels):
-                line = json.dumps({'key': key, 'duration': duration, 'text': label})
-                out_file.write(line + '\n')
+            data = [{'key': key, 'duration': duration, 'text': label} for key, duration, label in zip(keys, durations, labels)]
+            formatted_data = yaml.dump(data)
+            out_file.write(formatted_data + '\n')
 
 
 if __name__ == "__main__":

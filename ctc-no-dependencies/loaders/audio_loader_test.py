@@ -4,6 +4,7 @@
 
 import os
 
+import namedtupled
 import tensorflow as tf
 from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 from tensorflow.python.platform import test
@@ -36,7 +37,12 @@ class DataLoaderTest(test.TestCase):
         file_path = os.path.join(tmp_dir, "load_test.wav")
         wav_data = self.getWavData()
         self.saveTestWavFile(file_path, wav_data)
-        mfcc = load_mfcc(file_path)
+        audio_config = {
+            "window_size_ms": 550,
+            "window_stride_ms": 350,
+            "dct_coefficient_count": 13
+        }
+        mfcc = load_mfcc(file_path, namedtupled.map(audio_config))
         self.assertIsNotNone(mfcc)
 
     # def testLoadRealMfcc(self):

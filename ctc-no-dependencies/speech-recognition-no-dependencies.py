@@ -19,6 +19,7 @@ num_layers = 1  # lstm layers
 batch_size = 1  # ????
 learning_rate = 0.01
 momentum = 0.9
+initial_learning_rate = 1e-2
 
 # dataset
 num_examples = 1
@@ -55,23 +56,14 @@ def sparse_tuple_from(sequences, dtype=np.int32):
 
     return indices, values, shape
 
-# Hyper-parameters
-num_epochs = 200
-num_hidden = 50
-num_layers = 1
-batch_size = 1
-initial_learning_rate = 1e-2
-momentum = 0.9
-
-num_examples = 1
 num_batches_per_epoch = int(num_examples/batch_size)
 
 # loading audio processing config
 config_path = os.path.join(os.path.dirname(__file__), "config.yml")
-config = load_config(config_path)
+audio_config = load_config(config_path).audio
 
 # Loading the data
-inputs = load_mfcc(data_path(audio_filename), config.audio)
+inputs = load_mfcc(data_path(audio_filename), audio_config)
 
 # Tranform in 3D array
 train_inputs = inputs

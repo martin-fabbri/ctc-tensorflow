@@ -1,14 +1,13 @@
 """
 
 """
-
 import os
-
+import namedtupled
+import yaml
 import tensorflow as tf
 from tensorflow.contrib.framework.python.ops import audio_ops as contrib_audio
 from tensorflow.python.platform import test
-
-from loaders.data_loader import DataLoader
+from loaders.data_loader import DataLoader, _load_metadata_from_desc_file
 
 
 #todo: split data into train, test, validation
@@ -18,8 +17,23 @@ from loaders.data_loader import DataLoader
 
 
 class DataLoaderTest(test.TestCase):
-    def setUp(self):
-        self.data_loader = DataLoader()
+    def get_test_config(self, desc_file_path):
+        return {
+            "dataset": {
+                "path": desc_file_path,
+                "max_duration_seg": 10.0,
+                "test_size": 0.2
+            },
+            "train": {
+                "minibatch_size": 2,
+                "shuffle": False
+            },
+            "audio": {
+                "window_size_ms": 550,
+                "window_stride_ms": 350,
+                "dct_coefficient_count": 13
+            }
+        }
 
     def getWavData(self):
         with self.test_session() as sess:
@@ -28,67 +42,62 @@ class DataLoaderTest(test.TestCase):
             wav_data = sess.run(wav_encoder)
         return wav_data
 
-    def saveTestWavFile(self, filename, wav_data):
-        with open(filename, "wb") as f:
-            f.write(wav_data)
-
-    def testDescriptorFileEmpty(self):
-        with self.assertRaises(Exception) as e:
-            _ = DataLoader("")
-        self.assertTrue("Descriptor file not found." in str(e.exception))
-
-    def testLoadWavFile(self):
-        tmp_dir = self.get_temp_dir()
-        file_path = os.path.join(tmp_dir, "load_test.wav")
+    def saveTestWavFiles(self, file_paths):
         wav_data = self.getWavData()
-        self.saveTestWavFile(file_path, wav_data)
-        sample_data = self.data_loader.load_wav_file(file_path)
-        self.assertIsNotNone(sample_data)
+        for fp in file_paths:
+            with open(fp, "wb") as f:
+                f.write(wav_data)
 
-    def testLoadMfcc(self):
-        tmp_dir = self.get_temp_dir()
-        file_path = os.path.join(tmp_dir, "load_test.wav")
-        wav_data = self.getWavData()
-        self.saveTestWavFile(file_path, wav_data)
-        mfcc = self.data_loader.load_mfcc(file_path)
-        self.assertIsNotNone(mfcc)
+    def saveDescMetadataFile(self, file_path, keys):
+        with open(file_path, "w") as out_file:
+            data = [{"key": key, "duration": 1.0, "text": "Dummy text"}
+                    for key in keys]
+            formatted_data = yaml.dump(data)
+            out_file.write(formatted_data + '\n')
 
-    def testLoadRealMfcc(self):
-        file_name = "1.wav"
-        data_dir = "data"
+    def testLoadMetadataFromFile(self):
         dir = os.path.dirname(__file__)
-        file_path = os.path.join(dir, "..", data_dir, file_name)
-        mfcc = self.data_loader.load_mfcc(file_path)
-        self.assertIsNotNone(mfcc)
+        file_path = os.path.join(dir, "unittest_dataset_specs.yml")
+        audio_path, texts = _load_metadata_from_desc_file(file_path, 10.0)
+        self.assertIsNotNone(audio_path)
+        self.assertIsNotNone(texts)
 
-    # def testPrepareProcessingGraph(self):
-    #     tmp_dir = self.get_temp_dir()
-    #     wav_dir = os.path.join(tmp_dir, "wavs")
-    #     os.mkdir(wav_dir)
-    #     self._saveWavFolders(wav_dir, ["a", "b", "c"], 100)
-    #     background_dir = os.path.join(wav_dir, "_background_noise_")
-    #     os.mkdir(background_dir)
-    #     wav_data = self._getWavData()
-    #     for i in range(10):
-    #         file_path = os.path.join(background_dir, "background_audio_%d.wav" % i)
-    #         self._saveTestWavFile(file_path, wav_data)
-    #     model_settings = {
-    #         "desired_samples": 160,
-    #         "fingerprint_size": 40,
-    #         "label_count": 4,
-    #         "window_size_samples": 100,
-    #         "window_stride_samples": 100,
-    #         "dct_coefficient_count": 40,
-    #     }
-    #     audio_processor = input_data.AudioProcessor("", wav_dir, 10, 10, ["a", "b"],
-    #                                                 10, 10, model_settings)
-    #     self.assertIsNotNone(audio_processor.wav_filename_placeholder_)
-    #     self.assertIsNotNone(audio_processor.foreground_volume_placeholder_)
-    #     self.assertIsNotNone(audio_processor.time_shift_padding_placeholder_)
-    #     self.assertIsNotNone(audio_processor.time_shift_offset_placeholder_)
-    #     self.assertIsNotNone(audio_processor.background_data_placeholder_)
-    #     self.assertIsNotNone(audio_processor.background_volume_placeholder_)
-    #     self.assertIsNotNone(audio_processor.mfcc_)
+    def testDataLoadSplit(self):
+        tmp_dir = self.get_temp_dir()
+        wav_dir = os.path.join(tmp_dir, "wavs")
+        os.mkdir(wav_dir)
+        test_config = self.get_test_config(os.path.join(wav_dir, "test_spec.yml"))
+        config = namedtupled.map(test_config)
+        keys = [os.path.join(wav_dir, f"{i}.wav") for i in range(5)]
+        self.saveDescMetadataFile(config.dataset.path, keys)
+        self.saveTestWavFiles(keys)
+        data_loader = DataLoader(config)
+        self.assertIsNotNone(data_loader.dataset)
+        self.assertIsNotNone(data_loader.audio)
+        self.assertIsNotNone(data_loader.train)
+        self.assertIsNotNone(data_loader.audio_train)
+        self.assertIsNotNone(data_loader.audio_test)
+        self.assertIsNotNone(data_loader.text_train)
+        self.assertIsNotNone(data_loader.text_test)
+        self.assertEqual(len(data_loader.audio_train), 4)
+        self.assertEqual(len(data_loader.text_train), 4)
+        self.assertEqual(len(data_loader.audio_test), 1)
+        self.assertEqual(len(data_loader.text_test), 1)
+
+    def testNextTrainingBatch(self):
+        tmp_dir = self.get_temp_dir()
+        wav_dir = os.path.join(tmp_dir, "wavs")
+        os.mkdir(wav_dir)
+        test_config = self.get_test_config(os.path.join(wav_dir, "test_spec.yml"))
+        config = namedtupled.map(test_config)
+        keys = [os.path.join(wav_dir, f"{i}.wav") for i in range(5)]
+        self.saveDescMetadataFile(config.dataset.path, keys)
+        self.saveTestWavFiles(keys)
+        data_loader = DataLoader(config)
+        with self.test_session() as sess:
+            features, labels, texts = data_loader.next_training_batch(sess)
+            self.assertIsNotNone(features)
+            self.assertEquals(len(features), 2)
 
 
 if __name__ == "__main__":

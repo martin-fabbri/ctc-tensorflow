@@ -1,5 +1,10 @@
 dataset:
   path: /path/to/directory
+  max_duration_seg: 10.0
+  test_size: 0.2
+train:
+  minibatch_size: 16
+  shuffle: True
 audio:
   window_size_ms: 550
   window_stride_ms: 350
