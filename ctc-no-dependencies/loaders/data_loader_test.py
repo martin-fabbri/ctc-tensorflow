@@ -68,7 +68,7 @@ class DataLoaderTest(test.TestCase):
         os.mkdir(wav_dir)
         test_config = self.get_test_config(os.path.join(wav_dir, "test_spec.yml"))
         config = namedtupled.map(test_config)
-        keys = [os.path.join(wav_dir, f"{i}.wav") for i in ['a', 'b', 'c', 'd', 'f']]
+        keys = [os.path.join(wav_dir, f"{i}.wav") for i in "abcdf"]
         self.saveDescMetadataFile(config.dataset.path, keys)
         self.saveTestWavFiles(keys)
         data_loader = DataLoader(config)
@@ -90,7 +90,7 @@ class DataLoaderTest(test.TestCase):
         os.mkdir(wav_dir)
         test_config = self.get_test_config(os.path.join(wav_dir, "test_spec.yml"))
         config = namedtupled.map(test_config)
-        keys = [os.path.join(wav_dir, f"{i}.wav") for i in ['a', 'b', 'c', 'd', 'f']]
+        keys = [os.path.join(wav_dir, f"{i}.wav") for i in "abcdf"]
         self.saveDescMetadataFile(config.dataset.path, keys)
         self.saveTestWavFiles(keys)
         data_loader = DataLoader(config)
