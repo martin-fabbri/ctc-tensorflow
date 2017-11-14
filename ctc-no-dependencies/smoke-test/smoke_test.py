@@ -4,35 +4,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from loaders import load_mfcc, normalize
-from utils import char_map, char_to_int_encode, int_to_char_decode, load_config
-
-# Some configs
-num_features = 13
-# Accounting the 0th indice +  space + blank label = 28 characters
-num_classes = len(char_map)
-
-# training hyper-parameters
-num_epochs = 200
-num_hidden = 50
-num_layers = 1  # lstm layers
-batch_size = 1  # ????
-learning_rate = 0.01
-momentum = 0.9
-initial_learning_rate = 1e-2
-
-# dataset
-num_examples = 1
-mini_batch_size = 1
-
-# load training audio
-audio_filename = '2.wav'
-target_filename = '2.txt'
-
-
-def data_path(file_name):
-    dir = os.path.dirname(__file__)
-    return os.path.join(dir, '..', 'data', file_name)
+from loaders import DataLoader
+from utils import char_map, int_to_char_decode, load_config
 
 
 def sparse_tuple_from(sequences, dtype=np.int32):
@@ -56,39 +29,31 @@ def sparse_tuple_from(sequences, dtype=np.int32):
 
     return indices, values, shape
 
+
+# Some configs
+num_features = 13
+num_classes = len(char_map)
+
+# training hyper-parameters
+num_epochs = 200
+num_hidden = 50
+num_layers = 1  # lstm layers
+batch_size = 1  # ????
+learning_rate = 0.01
+momentum = 0.9
+initial_learning_rate = 1e-2
+
+# dataset
+num_examples = 1
 num_batches_per_epoch = int(num_examples/batch_size)
 
 # loading audio processing config
-config_path = os.path.join(os.path.dirname(__file__), "config.yml")
-audio_config = load_config(config_path).audio
-
-# Loading the data
-inputs = load_mfcc(data_path(audio_filename), audio_config)
-
-# Tranform in 3D array
-train_inputs = inputs
-train_inputs = normalize(train_inputs)
-train_seq_len = [train_inputs.shape[1]]
-
-# Readings targets
-with open(data_path(target_filename), 'r') as f:
-    #Only the last line is necessary
-    line = f.readlines()[-1]
-    original = line.replace("\n", "")
-    targets = original
-
-# Transform char into index
-targets = np.asarray(char_to_int_encode(targets))
-
-# Creating sparse representation to feed the placeholder
-train_targets = sparse_tuple_from([targets])
-
-# We don't have a validation dataset :(
-val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len
-
+current_dir = os.path.dirname(__file__)
+config_path = os.path.join(current_dir, "one_clip_config.yml")
+config = load_config(config_path, current_dir)
+data_loader = DataLoader(config)
 
 # THE MAIN CODE!
-
 graph = tf.Graph()
 with graph.as_default():
     # e.g: log filter bank or MFCC features
@@ -156,6 +121,18 @@ with graph.as_default():
                                           targets))
 
 with tf.Session(graph=graph) as session:
+    features, labels, texts = next(data_loader.iterate_training_batch(session, append_path=current_dir))
+
+    # Tranform in 3D array
+    train_inputs = features[0]
+    train_seq_len = [train_inputs.shape[1]]
+
+    # Creating sparse representation to feed the placeholder
+    train_targets = sparse_tuple_from([labels[0]])
+
+    # We don't have a validation dataset :(
+    val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len
+
     # Initializate the weights and biases
     tf.global_variables_initializer().run()
 
@@ -164,11 +141,9 @@ with tf.Session(graph=graph) as session:
         start = time.time()
 
         for batch in range(num_batches_per_epoch):
-
             feed = {inputs: train_inputs,
                     targets: train_targets,
                     seq_len: train_seq_len}
-
             batch_cost, _ = session.run([cost, optimizer], feed)
             train_cost += batch_cost*batch_size
             train_ler += session.run(ler, feed_dict=feed)*batch_size
@@ -189,5 +164,5 @@ with tf.Session(graph=graph) as session:
     d = session.run(decoded[0], feed_dict=feed)
     str_decoded = int_to_char_decode(d.values)
 
-    print('Original:\n%s' % original)
+    print('Original:\n%s' % texts[0])
     print('Decoded:\n%s' % str_decoded)

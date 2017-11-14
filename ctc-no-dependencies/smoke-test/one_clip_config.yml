@@ -1,0 +1,11 @@
+dataset:
+  path: one_clip_specs.yml
+  max_duration_seg: 10.0
+  test_size: 0.0
+train:
+  minibatch_size: 16
+  shuffle: False
+audio:
+  window_size_ms: 550
+  window_stride_ms: 350
+  dct_coefficient_count: 13

@@ -1,6 +1,7 @@
 """
 todo: Document
 """
+import os
 import yaml
 import namedtupled
 from utils.constants import PUNCTUATION
@@ -26,6 +27,9 @@ def int_to_char_decode(encoded):
     return "".join([index_map[i] for i in encoded])
 
 
-def load_config(absolute_json_file_path):
-    with open(absolute_json_file_path, encoding='utf-8-sig') as ymal_file:
-        return namedtupled.map(yaml.load(ymal_file))
+def load_config(file_path, append_path=None):
+    with open(file_path, encoding='utf-8-sig') as ymal_file:
+        props = yaml.load(ymal_file)
+        if append_path is not None:
+            props["dataset"]["path"] = os.path.join(append_path, props["dataset"]["path"])
+        return namedtupled.map(props)

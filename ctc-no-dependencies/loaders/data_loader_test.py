@@ -50,7 +50,7 @@ class DataLoaderTest(test.TestCase):
 
     def saveDescMetadataFile(self, file_path, keys):
         with open(file_path, "w") as out_file:
-            data = [{"key": key, "duration": 1.0, "text": "Dummy text"}
+            data = [{"key": key, "duration": 1.0, "text": f"Dummy text {key.split('/')[-1].replace('.', '')}"}
                     for key in keys]
             formatted_data = yaml.dump(data)
             out_file.write(formatted_data + '\n')
@@ -68,7 +68,7 @@ class DataLoaderTest(test.TestCase):
         os.mkdir(wav_dir)
         test_config = self.get_test_config(os.path.join(wav_dir, "test_spec.yml"))
         config = namedtupled.map(test_config)
-        keys = [os.path.join(wav_dir, f"{i}.wav") for i in range(5)]
+        keys = [os.path.join(wav_dir, f"{i}.wav") for i in ['a', 'b', 'c', 'd', 'f']]
         self.saveDescMetadataFile(config.dataset.path, keys)
         self.saveTestWavFiles(keys)
         data_loader = DataLoader(config)
@@ -90,14 +90,23 @@ class DataLoaderTest(test.TestCase):
         os.mkdir(wav_dir)
         test_config = self.get_test_config(os.path.join(wav_dir, "test_spec.yml"))
         config = namedtupled.map(test_config)
-        keys = [os.path.join(wav_dir, f"{i}.wav") for i in range(5)]
+        keys = [os.path.join(wav_dir, f"{i}.wav") for i in ['a', 'b', 'c', 'd', 'f']]
         self.saveDescMetadataFile(config.dataset.path, keys)
         self.saveTestWavFiles(keys)
         data_loader = DataLoader(config)
         with self.test_session() as sess:
-            features, labels, texts = data_loader.next_training_batch(sess)
+            # test a single iteration
+            features, labels, texts = next(data_loader.iterate_training_batch(sess))
             self.assertIsNotNone(features)
             self.assertEquals(len(features), 2)
+            self.assertEquals(len(labels), 2)
+            self.assertEquals(len(texts), 2)
+            # test all iterations
+            num_tuples_per_iteration = []
+            for features, labels, texts in data_loader.iterate_training_batch(sess):
+                num_tuples_per_iteration.append(len(features))
+            self.assertEquals(len(num_tuples_per_iteration), 2)
+            self.assertEquals(num_tuples_per_iteration[0], 2)
 
 
 if __name__ == "__main__":
